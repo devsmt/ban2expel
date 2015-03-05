@@ -1,0 +1,114 @@
+#! /usr/bin/env php
+<?php
+require_once 'common.php';
+require_once 'config.php';
+
+
+//----------------------------------------------------------------------------
+//  actions
+//----------------------------------------------------------------------------
+function action_download() {
+    global $my_hosts;
+    // scaricare i risultati di monitor fail2ban
+    // php /var/www/vhosts/agenzia/servertools/monitor_fail2ban > /var/www/fail2ban.monitor
+    // scaricare i hosts.deny attualmente installati
+    foreach( $my_hosts as $host ){
+        if( !file_exists("/tmp/fail2ban.monitor.$host") ){
+            echo `scp root@$host:/var/www/fail2ban.monitor   /tmp/fail2ban.monitor.$host`;
+        }
+        if( !file_exists("/etc/hosts.deny.$host") ){
+            echo `scp root@$host:/etc/hosts.deny /tmp/hosts.deny.$host`;
+        }
+    }
+}
+function action_merge(){
+    global $my_hosts;
+    // "/tmp/hosts.deny.$host /tmp/fail2ban.monitor.$host".each($my_hosts).implode(' ');
+
+    // merge e estrazione dei ban
+    echo `cat /tmp/hosts.deny.toro /tmp/hosts.deny.ariete /tmp/fail2ban.monitor.toro /tmp/fail2ban.monitor.ariete > /tmp/all1.txt`;
+    echo `grep  "ALL:" /tmp/all1.txt > /tmp/all2.txt`;
+
+    // ordinamento
+    // tolgo spazi alla fine delle istruzioni di riga
+    echo `cat /tmp/all2.txt | sed -e 's/\s*$//g' > /tmp/all3.txt`;
+    echo `sort -n /tmp/all3.txt > /tmp/all4.txt`;
+
+    // solo direttive uniche
+    `cat /tmp/all4.txt | uniq -i > /tmp/all5.txt  `;
+}
+
+function action_create_new(){
+    // prepara file finale
+    $contents = file_get_contents('/tmp/all5.txt');
+    $contents2 = '';
+    $contents2 .= "# 91.81.27.186 #rete caleffi \n" ;
+    $contents2 .= "# 188.135.167.235 #rete aria \n" ;
+    $contents2 .= "# 37.119.199.14 rete vodafone\n" ;
+    $contents2 .= "# 93.93.203.236 rete altea   \n" ;
+    $contents2 .= $contents;
+    file_put_contents('/tmp/hosts.deny.new', $contents2 );
+
+    // file pronto per essere installato
+    echo "lunghezza:",`cat hosts.deny.new | wc -l`;
+    `rm hosts.deny.new`;
+    `cp /tmp/hosts.deny.new hosts.deny.new`;
+    $date=date('dmY');
+    `cp hosts.deny.new hosts.deny.new.$date`;
+    echo "hosts.deny ready \n";
+    echo "lunghezza:",`cat hosts.deny.new | wc -l`;
+}
+
+function action_install(){
+    global $my_hosts;
+    // installa in remoto
+    foreach( $my_hosts as $host ){
+        echo "deploying to $host \n";
+        echo `scp hosts.deny.new root@$host:/etc/hosts.deny `;
+    }
+}
+
+function action_usage() {
+    return $html=<<<__END__
+available actions:
+calc
+test
+install
+all
+
+__END__;
+}
+
+//----------------------------------------------------------------------------
+//  main
+//----------------------------------------------------------------------------
+$action = isset($argv[1]) ? $argv[1] : 'usage';
+switch($action){
+case 'calc':
+    action_download();
+    action_merge();
+    action_create_new();
+    break;
+case 'test':
+    // slato download
+    action_merge();
+    action_create_new();
+    break;
+case 'install':
+    action_install();
+    break;
+case 'all':
+    action_download();
+    action_merge();
+    action_create_new();
+    action_install();
+    break;
+case 'usage':
+default:
+    echo action_usage();
+    break;
+}
+
+
+
+
