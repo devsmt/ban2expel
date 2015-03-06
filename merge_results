@@ -42,10 +42,7 @@ function action_create_new(){
     // prepara file finale
     $contents = file_get_contents('/tmp/all5.txt');
     $contents2 = '';
-    $contents2 .= "# 91.81.27.186 #rete caleffi \n" ;
-    $contents2 .= "# 188.135.167.235 #rete aria \n" ;
-    $contents2 .= "# 37.119.199.14 rete vodafone\n" ;
-    $contents2 .= "# 93.93.203.236 rete altea   \n" ;
+    $contents2 .= Config::getIPWhiteListMessage();
     $contents2 .= $contents;
     file_put_contents('/tmp/hosts.deny.new', $contents2 );
 
