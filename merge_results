@@ -12,18 +12,19 @@ function action_download() {
     // scaricare i risultati di monitor fail2ban
     // php /var/www/vhosts/agenzia/servertools/monitor_fail2ban > /var/www/fail2ban.monitor
     // scaricare i hosts.deny attualmente installati
-    foreach( $my_hosts as $host ){
+    foreach( $my_hosts as $host => $password ){
         if( !file_exists("/tmp/fail2ban.monitor.$host") ){
-            echo `scp root@$host:/var/www/fail2ban.monitor   /tmp/fail2ban.monitor.$host`;
+            echo `sshpass -p "$password" scp root@$host:/var/www/fail2ban.monitor   /tmp/fail2ban.monitor.$host`;
         }
         if( !file_exists("/etc/hosts.deny.$host") ){
-            echo `scp root@$host:/etc/hosts.deny /tmp/hosts.deny.$host`;
+            echo `sshpass -p "$password" scp root@$host:/etc/hosts.deny /tmp/hosts.deny.$host`;
         }
     }
 }
+
 function action_merge(){
     global $my_hosts;
-    // "/tmp/hosts.deny.$host /tmp/fail2ban.monitor.$host".each($my_hosts).implode(' ');
+    // TODO: "/tmp/hosts.deny.$host /tmp/fail2ban.monitor.$host".each($my_hosts).implode(' ');
 
     // merge e estrazione dei ban
     echo `cat /tmp/hosts.deny.toro /tmp/hosts.deny.ariete /tmp/fail2ban.monitor.toro /tmp/fail2ban.monitor.ariete > /tmp/all1.txt`;
@@ -44,6 +45,7 @@ function action_create_new(){
     $contents2 = '';
     $contents2 .= Config::getIPWhiteListMessage();
     $contents2 .= $contents;
+    $contents2 .= "\n";
     file_put_contents('/tmp/hosts.deny.new', $contents2 );
 
     // file pronto per essere installato
@@ -59,9 +61,9 @@ function action_create_new(){
 function action_install(){
     global $my_hosts;
     // installa in remoto
-    foreach( $my_hosts as $host ){
+    foreach( $my_hosts as $host => $password ){
         echo "deploying to $host \n";
-        echo `scp hosts.deny.new root@$host:/etc/hosts.deny `;
+        echo `sshpass -p "$password" scp hosts.deny.new root@$host:/etc/hosts.deny `;
     }
 }
 

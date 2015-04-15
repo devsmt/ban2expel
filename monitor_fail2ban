@@ -4,9 +4,9 @@ require_once 'common.php';
 require_once 'config.php';
 
 /*
-estrae dal log di F2B gli ip bannati
-interroga whois per avere range ip del provider
-banna provider stampando range ip in fomato hosts.deny
+extract from F2ban logs the banned I
+use whois query to determine the range of provider IP
+ban the subnet printing range ip in hosts.deny format
 */
 
 /* @see config.php
@@ -39,12 +39,12 @@ function parse_log($file_cont) {
 
         if( 0 !== $m ) {
 
-            $ip = implode('.', array(
+            $ip = implode('.', [
                 $matches[1][0],
                 $matches[2][0],
                 $matches[3][0],
                 $matches[4][0]
-                ) );
+                ] );
 
             //echo "$line \n";
             // echo sprintf( "# %s %s \n", $ip, get_country($ip) );
@@ -53,7 +53,7 @@ function parse_log($file_cont) {
     }
 }
 
-// salva e legge dati, che dureranno in cache 1 gg
+// save and read data, will last in cache 1 gg
 class MFCache {
     public static function fetch($cache_key) {
         $path = self::getFileName($cache_key);
@@ -88,7 +88,7 @@ class MFCache {
     }
 }
 
-// astrazione sui meccanismi di cache disponibili
+// abstraction on cache engines available
 class Cache {
     public static function exists($k){ return apc_exists($k); }
     public static function fetch($k){ return apc_fetch($k); }
@@ -109,8 +109,6 @@ class Whois {
         }
     }
 
-
-    //
     public static function get_country($ip) {
         $str = self::get_whois($ip);
         $a_lines = explode( "\n", $str);
@@ -125,7 +123,6 @@ class Whois {
         return '';
     }
 
-    //
     public static function get_inetnum($ip) {
         $str = self::get_whois($ip);
         $a_lines = explode( "\n", $str);
@@ -146,7 +143,7 @@ class TCPWrappers {
         // non prendo tutto l'ip, ma solo la prima parte
         // non uso cache perchè il file varia mentre sto analizzando il log
         $a=explode( '.', $ip);
-        $part_ip = implode('.', array($a[0],$a[1]) );
+        $part_ip = implode('.', [$a[0],$a[1]] );
         $cmd = "grep $part_ip /etc/hosts.deny | wc -l";
         // echo "$cmd \n";
         $count = `$cmd`;
@@ -157,7 +154,7 @@ class TCPWrappers {
         // non prendo tutto l'ip, ma solo la prima parte
         // non uso cache perchè il file varia mentre sto analizzando il log
         $a=explode( '.', $ip);
-        $part_ip = implode('.', array($a[0],$a[1]) );
+        $part_ip = implode('.', [$a[0],$a[1]] );
         $cmd = "grep 'ALL: $part_ip' /etc/hosts.deny ";
         // echo "$cmd \n";
         $count = `$cmd`;
@@ -176,17 +173,17 @@ class TCPWrappers {
         return $s;
     }
 
-    //dati due ip 202.109.128.0, 202.109.191.255, sviluppa un range
+    // dati due ip 202.109.128.0, 202.109.191.255, sviluppa un range
     public static function rangeFromIP($ip_1, $ip_2) {
         $a_ip_1 = explode('.', $ip_1);
         $a_ip_2 = explode('.', $ip_2);
 
         $i_ip_1 = ip2long($ip_1);
         $i_ip_2 = ip2long($ip_2);
-        // long2ip
+        // @see long2ip
 
-        //return array($ip_1, $ip_2);
-        $a = array();
+        //return [$ip_1, $ip_2];
+        $a = [];
         for( $i=$a_ip_1[2]; $i <= $a_ip_2[2]; $i++){
             $a[]="{$a_ip_1[0]}.{$a_ip_1[1]}.$i.";
         }
@@ -198,7 +195,7 @@ class TCPWrappers {
 
 // raccoglie gli ip e recupera info
 class IPList {
-    static $list=array();
+    static $list=[];
     public static function getAll(){
         ksort(self::$list);
         return self::$list;
@@ -208,12 +205,12 @@ class IPList {
         if( array_key_exists($ip, self::$list ) ){
             self::$list[ $ip ][ 'ban_count' ]++;
         } else {
-            self::$list[ $ip ] = array(
+            self::$list[ $ip ] = [
                 'ban_count' => 1,
                 'country'   => whois::get_country($ip),
                 'inetnum'   => whois::get_inetnum($ip),
                 'tcpwrap_denied' => TCPWrappers::count_deny($ip)
-            );
+            ];
         }
     }
 }
@@ -240,7 +237,7 @@ function is_in_whitelist($ip){
 //
 function action_main($only_missing=false) {
     // parsa il log e trova gli ip banned
-    foreach(array('/var/log/fail2ban.log','/var/log/fail2ban.log.1') as $logfile){
+    foreach( ['/var/log/fail2ban.log','/var/log/fail2ban.log.1'] as $logfile){
         $file_cont = file_get_contents($logfile);
         parse_log($file_cont);
     }
