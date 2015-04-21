@@ -1,7 +1,7 @@
 #! /usr/bin/env php
 <?php
-require_once 'common.php';
-require_once 'config.php';
+require_once dirname(__FILE__).'/common.php';
+require_once dirname(__FILE__).'/config.php';
 
 
 //----------------------------------------------------------------------------
@@ -71,9 +71,9 @@ function action_usage() {
     return $html=<<<__END__
 available actions:
 calc
-test
 install
 all
+test
 
 __END__;
 }
