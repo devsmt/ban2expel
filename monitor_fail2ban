@@ -36,9 +36,7 @@ function parse_log($file_cont) {
     foreach($a_lines as $line){
         // 2014-03-28 01:56:31,793 fail2ban.actions: WARNING [ssh] Ban 212.83.175.89
         $m = preg_match('/Ban ([0-9]{1,3}).([0-9]{1,3}).([0-9]{1,3}).([0-9]{1,3})/', $line, $matches, PREG_OFFSET_CAPTURE);
-
         if( 0 !== $m ) {
-
             $ip = implode('.', [
                 $matches[1][0],
                 $matches[2][0],
@@ -113,14 +111,15 @@ Reference: WHOIS servers of RIRs
   AfriNIC WHOIS(whois.afrinic.net)
 */
     // cached whois
+    // ritorna str vuota se non trova info
     public static function get_whois($ip) {
         if( Cache::exists($ip) ) {
-            echo "# whois from cache ".time()."\n";
+            echo "\n"."# whois from cache ".time()."\n";
             return Cache::fetch($ip);
         } else {
             $str = `whois $ip`;
             Cache::add( $ip, $str, $ttl=60*60*2 );
-            return $str;
+            return trim($str);
         }
     }
     // TODO: quando non è possibile determinare la country dall'output di whois
@@ -160,7 +159,7 @@ Reference: WHOIS servers of RIRs
         }*/
 
         if( Cache::exists($ip) ) {
-            echo "# whois from cache ".time()."\n";
+            echo "\n"."# whois from cache ".time()."\n";
             $json = Cache::fetch($ip);
         } else {
             $json = `curl ipinfo.io/$ip`;
@@ -183,8 +182,31 @@ Reference: WHOIS servers of RIRs
         return '';
     }
 
+    /*
+sudo geoip-database-contrib_update
+geoiplookup 211.216.48.205
+GeoIP Country Edition: KR, Korea, Republic of
+GeoIP City Edition, Rev 1: KR, N/A, N/A, N/A, N/A, 37.570000, 126.980003, 0, 0
+GeoIP ASNum Edition: AS4766 Korea Telecom
+    */
+    public static function get_DB_country($ip){
+        $txt = `/usr/bin/geoiplookup $ip`;
+        // returns 1 pattern matches, 0 if not, FALSE if an error
+        $num_matches = preg_match('/^GeoIP Country Edition: (.*),(.*)$/', $txt, $a_matches, PREG_OFFSET_CAPTURE);
+        if(false === $num_matches) {
+            $a_pcre_err=array_flip(get_defined_constants(true)['pcre']);
+            die( preg_last_error() /*.' '.$a_pcre_err[preg_last_error()]*/ );
+        } elseif($num_matches===0) {
+            // no matches
+            return '';
+        } else {
+            // ok
 
-
+            // echo '<pre>',var_dump( $a_matches ),'</pre>'; // DEBUG
+            // die(__FUNCTION__.' '.__FILE__.' '.__LINE__);
+            return $a_matches[1];
+        }
+    }
 
 
     // TODO: nel caso non sia possibile recuperare un inetnum perché whois non
@@ -192,13 +214,15 @@ Reference: WHOIS servers of RIRs
     // ritorna un range di sintesi
     public static function get_inetnum($ip) {
         $str = self::get_whois($ip);
-        $a_lines = explode( "\n", $str);
-        foreach($a_lines as $line  ){
-            // "inetnum:        85.25.203.255 - 85.25.203.255"
-            if( strpos($line, 'inetnum:') !== false ) {
-                $s = str_replace('inetnum:','',$line);
-                $s = trim($s);
-                return $s;
+        if( !empty($str) ) {
+            $a_lines = explode("\n", $str);
+            foreach($a_lines as $line  ){
+                // "inetnum:        85.25.203.255 - 85.25.203.255"
+                if( strpos($line, 'inetnum:') !== false ) {
+                    $s = str_replace('inetnum:','',$line);
+                    $s = trim($s);
+                    return $s;
+                }
             }
         }
         return self::build_inetnum($ip);
