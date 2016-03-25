@@ -27,7 +27,8 @@ function action_merge(){
     // TODO: "/tmp/hosts.deny.$host /tmp/fail2ban.monitor.$host".each($my_hosts).implode(' ');
 
     // merge e estrazione dei ban
-    echo `cat /tmp/hosts.deny.toro /tmp/hosts.deny.ariete /tmp/fail2ban.monitor.toro /tmp/fail2ban.monitor.ariete > /tmp/all1.txt`;
+    // /tmp/hosts.deny.toro /tmp/fail2ban.monitor.toro
+    echo `cat  /tmp/hosts.deny.ariete  /tmp/fail2ban.monitor.ariete > /tmp/all1.txt`;
     echo `grep  "ALL:" /tmp/all1.txt > /tmp/all2.txt`;
 
     // ordinamento
