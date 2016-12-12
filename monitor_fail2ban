@@ -4,9 +4,15 @@ require_once dirname(__FILE__).'/common.php';
 require_once dirname(__FILE__).'/config.php';
 
 /*
-extract from F2ban logs the banned I
+extract from F2ban logs the banned IP
 use whois query to determine the range of provider IP
 ban the subnet printing range ip in hosts.deny format
+*/
+
+/*
+TODO:
+- use PHP7
+- use file cache instead of APC
 */
 
 /* @see config.php
@@ -19,10 +25,7 @@ class Config {
     // first 3 digits of IP classes that will be skipped
     public static function getIPWhiteList() {
         return [
-        "91.",
-        "188",
-        "37.",
-        "93.",
+        "192.",
         ];
     }
 }*/
@@ -51,24 +54,50 @@ function parse_log($file_cont) {
     }
 }
 
+
+//------------------------------------------------------------------------------
+// cache routines
+//------------------------------------------------------------------------------
+/*
+class Cache {
+    public static function exists($k){ return apc_exists($k); }
+    public static function fetch($k){ return apc_fetch($k); }
+    public static function store($k, $str, $ttl){ return apc_store( $k, $str, $ttl); }
+    public static function add($k, $str, $ttl){ return self::store( $k, $str, $ttl); }
+}
+*/
+class Cache {
+    public static function exists($k){ return MFCache::fetch($k) !== false; }
+    public static function fetch($k){ return MFCache::fetch($k); }
+    public static function store($k, $str, $ttl=''){ return MFCache::store( $k, $str, $ttl); }
+    public static function add($k, $str, $ttl){ return self::store( $k, $str, $ttl); }
+}
+
 // save and read data, will last in cache 1 gg
 class MFCache {
+    static $data = [];
     public static function fetch($cache_key) {
-        $path = self::getFileName($cache_key);
+        $path = self::getFileName();
         if( !file_exists($path) ) {
             return false;
         }
-        return unserialize( file_get_contents($path) );
+        if( empty(self::$data) ) {
+            self::$data = unserialize( file_get_contents($path) );
+        }
+        return isset(self::$data[$cache_key]) ? self::$data[ $cache_key ] : false;
     }
     public static function store($cache_key, $val, $ttl_secs=3600 ) {
+        self::$data[$cache_key] = $val;
         $path = self::getFileName($cache_key);
-        file_put_contents($path, serialize($val) );
+        file_put_contents($path, serialize(self::$data) );
     }
-    public static $cache_dir = dirname( realpath(__FILE__) );
+    public static $cache_dir = __DIR__;
     public static $cache_date_fmt = 'Ymd';
     // ottiene il filename.  la cache dura tutta la giornata
-    public static function getFileName($cache_key) {
-        $f = sprintf('%s/cache/%s_%s.txt', self::$cache_dir, $cache_key , date(self::$cache_date_fmt) );
+    public static function getFileName( ) {
+        $f = sprintf('%s/cache/%s_%s.txt', self::$cache_dir,
+            $name=basename(__FILE__) ,
+            date(self::$cache_date_fmt) );
         return $f;
     }
     // eliminare i file più vecchi di 1 giorno
@@ -85,13 +114,42 @@ class MFCache {
         }
     }
 }
+MFCache::cleanup();
+// MFCache::store( $k='aa', $str=111);
+// $v = MFCache::fetch( $k);
 
+/*
 // abstraction on cache engines available
-class Cache {
-    public static function exists($k){ return apc_exists($k); }
-    public static function fetch($k){ return apc_fetch($k); }
-    public static function store($k, $str, $ttl){ return apc_add( $ip, $str, $ttl); }
+ini_set('apc.enable_cli',1);
+if (!function_exists('apc_fetch')) {
+    function apc_fetch($key) {
+        return apcu_fetch($key);
+    }
+    function apc_exists($keys) {
+        return apcu_exists($keys);
+    }
+    function apc_delete($key) {
+        return apcu_delete($key);
+    }
+    function apc_store($key, $var, $ttl) {
+        return apcu_store($key, $var, $ttl);
+    }
+    function apc_inc($key, $step = 1) {
+        return apcu_inc($key, $step);
+    }
+    function apc_cache_info($cache_type = "", $limited = false) {return apcu_cache_info($limited);}
+
+    function apc_clear_cache() {return apcu_clear_cache();}
 }
+if(!function_exists('apc_exists')) {
+    function apc_exists($keys) {
+        $result = false;
+        $v = apc_fetch($keys, $result);
+        return $result;
+    }
+}*/
+
+//------------------------------------------------------------------------------
 
 
 class Whois {
@@ -146,7 +204,7 @@ Reference: WHOIS servers of RIRs
     PHP geoip
         /etc/php5/mods-available/geoip.ini
     Cloud API:
-        curl ipinfo.io
+        curl -sS ipinfo.io
     */
     public static function get_WS_country($ip){
         // ip es. 43.255.190.116
@@ -162,14 +220,16 @@ Reference: WHOIS servers of RIRs
             echo "\n"."# whois from cache ".time()."\n";
             $json = Cache::fetch($ip);
         } else {
-            $json = `curl ipinfo.io/$ip`;
+            $cmd = "curl -sS ipinfo.io/$ip";
+            echo "# $cmd \n";
+            $json = `$cmd`;
             $json = trim($json);
             Cache::add( $ip, $json, $ttl=60*60*2 );
         }
 
 
         try {
-            $a = json_decode($json);
+            $a = json_decode($json, $assoc=true);
             if( empty($a) ) {
                 return '';
             }
@@ -314,13 +374,7 @@ class IPList {
         }
     }
 }
-if(!function_exists('apc_exists')) {
-    function apc_exists($keys) {
-        $result = false;
-        $v = apc_fetch($keys, $result);
-        return $result;
-    }
-}
+
 function is_in_whitelist($ip){
     $a_whitelist = Config::getIPWhiteList();
     $ip_beg = substr($ip,0,3);
