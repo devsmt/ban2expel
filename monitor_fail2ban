@@ -151,6 +151,9 @@ if(!function_exists('apc_exists')) {
 
 //------------------------------------------------------------------------------
 
+function safe_IP($str) {
+    return preg_replace('/[^0-9\.]/i', '', $str);
+};
 
 class Whois {
 
@@ -171,6 +174,8 @@ Reference: WHOIS servers of RIRs
     // cached whois
     // ritorna str vuota se non trova info
     public static function get_whois($ip) {
+        $ip = safe_IP($ip);
+        //
         if( Cache::exists($ip) ) {
             echo "\n"."# whois from cache ".time()."\n";
             return Cache::fetch($ip);
@@ -215,6 +220,7 @@ Reference: WHOIS servers of RIRs
         "country": "HK",
         "loc": "22.2500,114.1667"
         }*/
+        $ip = safe_IP($ip);
 
         if( Cache::exists($ip) ) {
             echo "\n"."# whois from cache ".time()."\n";
@@ -250,6 +256,8 @@ GeoIP City Edition, Rev 1: KR, N/A, N/A, N/A, N/A, 37.570000, 126.980003, 0, 0
 GeoIP ASNum Edition: AS4766 Korea Telecom
     */
     public static function get_DB_country($ip){
+        $ip = safe_IP($ip);
+
         $txt = `/usr/bin/geoiplookup $ip`;
         // returns 1 pattern matches, 0 if not, FALSE if an error
         $num_matches = preg_match('/^GeoIP Country Edition: (.*),(.*)$/', $txt, $a_matches, PREG_OFFSET_CAPTURE);
@@ -300,6 +308,8 @@ GeoIP ASNum Edition: AS4766 Korea Telecom
 
 class TCPWrappers {
     public static function count_deny($ip){
+        $ip = safe_IP($ip);
+
         // non prendo tutto l'ip, ma solo la prima parte
         // non uso cache perchè il file varia mentre sto analizzando il log
         $a=explode( '.', $ip);
@@ -311,6 +321,8 @@ class TCPWrappers {
     }
 
     public static function getDenyCount($ip){
+        $ip = safe_IP($ip);
+
         // non prendo tutto l'ip, ma solo la prima parte
         // non uso cache perchè il file varia mentre sto analizzando il log
         $a=explode( '.', $ip);
